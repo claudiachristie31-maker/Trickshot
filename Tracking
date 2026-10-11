@@ -1,113 +1,115 @@
 
 -- [made by Nickoy]
--- Tracking Panel + Working Toggle Button
--- Place in StarterPlayer > StarterPlayerScripts
--- Use in your own Roblox Studio game.
+-- Auto Tracking Panel
+-- For your own Roblox Studio game
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local tracking = false
+local enabled = false
 local maxRange = 250
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "NickoyTrackingPanel"
+gui.Name = "NickoyAutoTracker"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(270, 175)
+frame.Size = UDim2.fromOffset(265, 155)
 frame.Position = UDim2.new(0.05, 0, 0.35, 0)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+frame.BackgroundColor3 = Color3.fromRGB(24, 24, 34)
 frame.Active = true
 frame.Draggable = true
 frame.Parent = gui
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", frame).CornerRadius =
+    UDim.new(0, 10)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 38)
-title.BackgroundColor3 = Color3.fromRGB(60, 90, 180)
-title.Text = "[made by Nickoy] Tracker"
+title.Size = UDim2.new(1, 0, 0, 36)
+title.BackgroundColor3 = Color3.fromRGB(55, 90, 180)
+title.Text = "[made by Nickoy] Auto Tracker"
 title.TextColor3 = Color3.new(1, 1, 1)
-title.TextSize = 16
+title.TextSize = 15
 title.Parent = frame
 
-local button = Instance.new("TextButton")
-button.Size = UDim2.new(1, -20, 0, 38)
-button.Position = UDim2.fromOffset(10, 48)
-button.BackgroundColor3 = Color3.fromRGB(170, 55, 55)
-button.Text = "TRACKING: OFF"
-button.TextColor3 = Color3.new(1, 1, 1)
-button.TextSize = 16
-button.Parent = frame
-Instance.new("UICorner", button).CornerRadius = UDim.new(0, 7)
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(1, -20, 0, 38)
+toggle.Position = UDim2.fromOffset(10, 46)
+toggle.BackgroundColor3 = Color3.fromRGB(170, 55, 55)
+toggle.Text = "AUTO TRACK: OFF"
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.TextSize = 15
+toggle.Parent = frame
 
-local rangeBox = Instance.new("TextBox")
-rangeBox.Size = UDim2.new(1, -20, 0, 30)
-rangeBox.Position = UDim2.fromOffset(10, 94)
-rangeBox.Text = "250"
-rangeBox.PlaceholderText = "Range in studs"
-rangeBox.ClearTextOnFocus = false
-rangeBox.Parent = frame
+Instance.new("UICorner", toggle).CornerRadius =
+    UDim.new(0, 7)
 
 local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, -20, 0, 30)
-status.Position = UDim2.fromOffset(10, 134)
+status.Size = UDim2.new(1, -20, 0, 45)
+status.Position = UDim2.fromOffset(10, 94)
 status.BackgroundTransparency = 1
 status.TextColor3 = Color3.new(1, 1, 1)
-status.Text = "Ready"
 status.TextSize = 13
+status.TextWrapped = true
+status.Text = "Tracking disabled"
 status.Parent = frame
 
-button.Activated:Connect(function()
-    tracking = not tracking
-
-    button.Text = tracking and "TRACKING: ON" or "TRACKING: OFF"
-    button.BackgroundColor3 = tracking
-        and Color3.fromRGB(40, 160, 90)
-        or Color3.fromRGB(170, 55, 55)
-
-    status.Text = tracking and "Searching..." or "Paused"
-end)
-
-rangeBox.FocusLost:Connect(function()
-    local value = tonumber(rangeBox.Text)
-    if value then
-        maxRange = math.clamp(math.floor(value), 1, 1000)
-    end
-    rangeBox.Text = tostring(maxRange)
-end)
-
-RunService.RenderStepped:Connect(function()
-    if not tracking then return end
-
+local function nearestPlayer()
     local char = player.Character
-    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
 
-    local nearest, nearestDist
+    local best, bestDistance = nil, maxRange
 
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
-            local targetChar = other.Character
-            local root = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
-            local hum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+            local otherChar = other.Character
+            local otherRoot = otherChar
+                and otherChar:FindFirstChild("HumanoidRootPart")
+            local hum = otherChar
+                and otherChar:FindFirstChildOfClass("Humanoid")
 
-            if root and hum and hum.Health > 0 then
-                local dist = (root.Position - myRoot.Position).Magnitude
+            if otherRoot and hum and hum.Health > 0 then
+                local distance =
+                    (otherRoot.Position - root.Position).Magnitude
 
-                if dist <= maxRange and
-                    (not nearestDist or dist < nearestDist) then
-                    nearest = other
-                    nearestDist = dist
+                if distance < bestDistance then
+                    best = other
+                    bestDistance = distance
                 end
             end
         end
     end
 
-    status.Text = nearest
-        and ("Target: " .. nearest.Name .. " | " .. math.floor(nearestDist) .. " studs")
-        or "No target in range"
+    return best, bestDistance
+end
+
+toggle.Activated:Connect(function()
+    enabled = not enabled
+
+    toggle.Text = enabled and "AUTO TRACK: ON"
+        or "AUTO TRACK: OFF"
+
+    toggle.BackgroundColor3 = enabled
+        and Color3.fromRGB(35, 155, 85)
+        or Color3.fromRGB(170, 55, 55)
+
+    status.Text = enabled
+        and "Searching for nearest player..."
+        or "Tracking disabled"
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not enabled then return end
+
+    local target, distance = nearestPlayer()
+
+    if target then
+        status.Text = "Target: " .. target.Name
+            .. "\nDistance: " .. math.floor(distance) .. " studs"
+    else
+        status.Text = "No player in range"
+    end
 end)
