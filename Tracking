@@ -1,115 +1,427 @@
-
+-- NICKOY CAMERA LOCK + ESP
 -- [made by Nickoy]
--- Auto Tracking Panel
--- For your own Roblox Studio game
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local enabled = false
-local maxRange = 250
+local playerGui = player:WaitForChild("PlayerGui")
 
+local TRACK_NAME = "NickoyCameraLock"
+local MAX_DISTANCE = 250
+
+local tracking = false
+local espEnabled = false
+local strength = 0.25
+local target = nil
+local espObjects = {}
+local connections = {}
+
+-- Cleanup previous copy
+RunService:UnbindFromRenderStep(TRACK_NAME)
+
+local oldGui = playerGui:FindFirstChild("NickoyCameraLockGUI")
+if oldGui then
+    oldGui:Destroy()
+end
+
+-- GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "NickoyAutoTracker"
+gui.Name = "NickoyCameraLockGUI"
 gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+gui.Parent = playerGui
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(265, 155)
-frame.Position = UDim2.new(0.05, 0, 0.35, 0)
-frame.BackgroundColor3 = Color3.fromRGB(24, 24, 34)
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
+-- Main panel
+local panel = Instance.new("Frame")
+panel.Name = "MainPanel"
+panel.Size = UDim2.fromOffset(360, 300)
+panel.Position = UDim2.new(0.5, -180, 0.5, -150)
+panel.BackgroundColor3 = Color3.fromRGB(25, 22, 38)
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Parent = gui
 
-Instance.new("UICorner", frame).CornerRadius =
-    UDim.new(0, 10)
+Instance.new("UICorner", panel).CornerRadius =
+    UDim.new(0, 12)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 36)
-title.BackgroundColor3 = Color3.fromRGB(55, 90, 180)
-title.Text = "[made by Nickoy] Auto Tracker"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextSize = 15
-title.Parent = frame
+title.Size = UDim2.new(1, -60, 0, 40)
+title.Position = UDim2.fromOffset(12, 4)
+title.BackgroundTransparency = 1
+title.Text = "NICKOY CAMERA + ESP"
+title.TextColor3 = Color3.fromRGB(210, 160, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = panel
 
-local toggle = Instance.new("TextButton")
-toggle.Size = UDim2.new(1, -20, 0, 38)
-toggle.Position = UDim2.fromOffset(10, 46)
-toggle.BackgroundColor3 = Color3.fromRGB(170, 55, 55)
-toggle.Text = "AUTO TRACK: OFF"
-toggle.TextColor3 = Color3.new(1, 1, 1)
-toggle.TextSize = 15
-toggle.Parent = frame
+-- Hide button
+local hideButton = Instance.new("TextButton")
+hideButton.Size = UDim2.fromOffset(44, 32)
+hideButton.Position = UDim2.new(1, -50, 0, 7)
+hideButton.Text = "HIDE"
+hideButton.TextScaled = true
+hideButton.Font = Enum.Font.GothamBold
+hideButton.TextColor3 = Color3.new(1, 1, 1)
+hideButton.BackgroundColor3 = Color3.fromRGB(120, 65, 180)
+hideButton.Parent = panel
 
-Instance.new("UICorner", toggle).CornerRadius =
+Instance.new("UICorner", hideButton).CornerRadius =
     UDim.new(0, 7)
 
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, -20, 0, 45)
-status.Position = UDim2.fromOffset(10, 94)
-status.BackgroundTransparency = 1
-status.TextColor3 = Color3.new(1, 1, 1)
-status.TextSize = 13
-status.TextWrapped = true
-status.Text = "Tracking disabled"
-status.Parent = frame
+-- Show button
+local showButton = Instance.new("TextButton")
+showButton.Name = "ShowPanelButton"
+showButton.Size = UDim2.fromOffset(130, 44)
+showButton.Position = UDim2.new(1, -145, 0.5, -22)
+showButton.Text = "SHOW PANEL"
+showButton.TextScaled = true
+showButton.Font = Enum.Font.GothamBold
+showButton.TextColor3 = Color3.new(1, 1, 1)
+showButton.BackgroundColor3 = Color3.fromRGB(120, 65, 180)
+showButton.Visible = false
+showButton.Parent = gui
 
-local function nearestPlayer()
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
+Instance.new("UICorner", showButton).CornerRadius =
+    UDim.new(0, 9)
 
-    local best, bestDistance = nil, maxRange
+hideButton.Activated:Connect(function()
+    panel.Visible = false
+    showButton.Visible = true
+end)
 
-    for _, other in ipairs(Players:GetPlayers()) do
-        if other ~= player then
-            local otherChar = other.Character
-            local otherRoot = otherChar
-                and otherChar:FindFirstChild("HumanoidRootPart")
-            local hum = otherChar
-                and otherChar:FindFirstChildOfClass("Humanoid")
+showButton.Activated:Connect(function()
+    panel.Visible = true
+    showButton.Visible = false
+end)
 
-            if otherRoot and hum and hum.Health > 0 then
+-- Reusable button creator
+local function makeButton(name, text, y)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Size = UDim2.new(1, -24, 0, 42)
+    button.Position = UDim2.fromOffset(12, y)
+    button.BackgroundColor3 = Color3.fromRGB(75, 55, 105)
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextScaled = true
+    button.Font = Enum.Font.GothamBold
+    button.Parent = panel
+
+    Instance.new("UICorner", button).CornerRadius =
+        UDim.new(0, 8)
+
+    return button
+end
+
+-- Camera lock toggle
+local lockButton = makeButton(
+    "LockButton",
+    "CAMERA LOCK: OFF",
+    52
+)
+
+-- ESP toggle
+local espButton = makeButton(
+    "ESPButton",
+    "PLAYER ESP: OFF",
+    102
+)
+
+-- Strength label
+local strengthLabel = Instance.new("TextLabel")
+strengthLabel.Size = UDim2.new(1, -24, 0, 30)
+strengthLabel.Position = UDim2.fromOffset(12, 158)
+strengthLabel.BackgroundTransparency = 1
+strengthLabel.Text = "TRACKING STRENGTH: 25%"
+strengthLabel.TextColor3 = Color3.new(1, 1, 1)
+strengthLabel.TextScaled = true
+strengthLabel.Font = Enum.Font.Gotham
+strengthLabel.Parent = panel
+
+-- Slider
+local sliderBack = Instance.new("Frame")
+sliderBack.Size = UDim2.new(1, -30, 0, 14)
+sliderBack.Position = UDim2.fromOffset(15, 207)
+sliderBack.BackgroundColor3 = Color3.fromRGB(65, 60, 75)
+sliderBack.BorderSizePixel = 0
+sliderBack.Parent = panel
+
+Instance.new("UICorner", sliderBack).CornerRadius =
+    UDim.new(1, 0)
+
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new(strength, 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(190, 120, 255)
+sliderFill.BorderSizePixel = 0
+sliderFill.Parent = sliderBack
+
+Instance.new("UICorner", sliderFill).CornerRadius =
+    UDim.new(1, 0)
+
+local sliderButton = Instance.new("TextButton")
+sliderButton.Size = UDim2.new(1, 0, 0, 38)
+sliderButton.Position = UDim2.new(0, 0, 0.5, -19)
+sliderButton.BackgroundTransparency = 1
+sliderButton.Text = ""
+sliderButton.Parent = sliderBack
+
+-- Find nearest living player
+local function getNearestTarget()
+    local character = player.Character
+    local root = character and
+        character:FindFirstChild("HumanoidRootPart")
+
+    if not root then
+        return nil
+    end
+
+    local nearest
+    local nearestDistance = MAX_DISTANCE
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            local otherCharacter = otherPlayer.Character
+            local otherRoot = otherCharacter and
+                otherCharacter:FindFirstChild("HumanoidRootPart")
+            local humanoid = otherCharacter and
+                otherCharacter:FindFirstChildOfClass("Humanoid")
+
+            if otherRoot and humanoid and humanoid.Health > 0 then
                 local distance =
                     (otherRoot.Position - root.Position).Magnitude
 
-                if distance < bestDistance then
-                    best = other
-                    bestDistance = distance
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearest = otherRoot
                 end
             end
         end
     end
 
-    return best, bestDistance
+    return nearest
 end
 
-toggle.Activated:Connect(function()
-    enabled = not enabled
+-- ESP cleanup
+local function removeESP(otherPlayer)
+    local objects = espObjects[otherPlayer]
 
-    toggle.Text = enabled and "AUTO TRACK: ON"
-        or "AUTO TRACK: OFF"
+    if objects then
+        for _, object in ipairs(objects) do
+            if object and object.Parent then
+                object:Destroy()
+            end
+        end
 
-    toggle.BackgroundColor3 = enabled
-        and Color3.fromRGB(35, 155, 85)
-        or Color3.fromRGB(170, 55, 55)
+        espObjects[otherPlayer] = nil
+    end
+end
 
-    status.Text = enabled
-        and "Searching for nearest player..."
-        or "Tracking disabled"
+-- Create through-wall ESP for this experience
+local function createESP(otherPlayer)
+    if otherPlayer == player or not espEnabled then
+        return
+    end
+
+    removeESP(otherPlayer)
+
+    local character = otherPlayer.Character
+    if not character then
+        return
+    end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "NickoyESPHighlight"
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(155, 70, 255)
+    highlight.OutlineColor = Color3.new(1, 1, 1)
+    highlight.FillTransparency = 0.65
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = character
+
+    local objects = {highlight}
+    local head = character:FindFirstChild("Head")
+
+    if head then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "NickoyESPName"
+        billboard.Adornee = head
+        billboard.Size = UDim2.fromOffset(180, 36)
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = playerGui
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.fromScale(1, 1)
+        label.BackgroundTransparency = 1
+        label.Text = otherPlayer.DisplayName
+        label.TextColor3 = Color3.fromRGB(220, 180, 255)
+        label.TextStrokeTransparency = 0.2
+        label.TextScaled = true
+        label.Font = Enum.Font.GothamBold
+        label.Parent = billboard
+
+        table.insert(objects, billboard)
+    end
+
+    espObjects[otherPlayer] = objects
+end
+
+local function refreshESP()
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if espEnabled then
+            createESP(otherPlayer)
+        else
+            removeESP(otherPlayer)
+        end
+    end
+end
+
+-- ESP toggle
+espButton.Activated:Connect(function()
+    espEnabled = not espEnabled
+    espButton.Text = espEnabled and "PLAYER ESP: ON"
+        or "PLAYER ESP: OFF"
+
+    espButton.BackgroundColor3 = espEnabled
+        and Color3.fromRGB(120, 65, 180)
+        or Color3.fromRGB(75, 55, 105)
+
+    refreshESP()
 end)
 
-RunService.RenderStepped:Connect(function()
-    if not enabled then return end
+-- Handle respawns and new players
+local function watchPlayer(otherPlayer)
+    if otherPlayer == player then
+        return
+    end
 
-    local target, distance = nearestPlayer()
+    table.insert(connections, otherPlayer.CharacterAdded:Connect(function()
+        task.wait(1)
 
-    if target then
-        status.Text = "Target: " .. target.Name
-            .. "\nDistance: " .. math.floor(distance) .. " studs"
-    else
-        status.Text = "No player in range"
+        if espEnabled then
+            createESP(otherPlayer)
+        end
+    end))
+end
+
+for _, otherPlayer in ipairs(Players:GetPlayers()) do
+    watchPlayer(otherPlayer)
+end
+
+table.insert(connections, Players.PlayerAdded:Connect(watchPlayer))
+
+table.insert(connections, Players.PlayerRemoving:Connect(function(otherPlayer)
+    removeESP(otherPlayer)
+end))
+
+-- Camera lock toggle
+lockButton.Activated:Connect(function()
+    tracking = not tracking
+
+    lockButton.Text = tracking and "CAMERA LOCK: ON"
+        or "CAMERA LOCK: OFF"
+
+    lockButton.BackgroundColor3 = tracking
+        and Color3.fromRGB(120, 65, 180)
+        or Color3.fromRGB(75, 55, 105)
+
+    target = tracking and getNearestTarget() or nil
+end)
+
+-- Slider interaction: mouse and touch
+local dragging = false
+
+local function updateSlider(input)
+    local width = sliderBack.AbsoluteSize.X
+    if width <= 0 then
+        return
+    end
+
+    local relativeX = math.clamp(
+        (input.Position.X - sliderBack.AbsolutePosition.X) / width,
+        0.05,
+        1
+    )
+
+    strength = relativeX
+    sliderFill.Size = UDim2.new(strength, 0, 1, 0)
+    strengthLabel.Text = "TRACKING STRENGTH: "
+        .. math.floor(strength * 100) .. "%"
+end
+
+sliderButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        updateSlider(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        updateSlider(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- Camera tracking
+RunService:BindToRenderStep(
+    TRACK_NAME,
+    Enum.RenderPriority.Camera.Value + 1,
+    function()
+        if not tracking then
+            return
+        end
+
+        if not target
+            or not target.Parent
+            or not target:IsDescendantOf(workspace) then
+            target = getNearestTarget()
+        end
+
+        if not target then
+            return
+        end
+
+        local currentCamera = workspace.CurrentCamera
+        if not currentCamera then
+            return
+        end
+
+        currentCamera.CFrame = currentCamera.CFrame:Lerp(
+            CFrame.lookAt(
+                currentCamera.CFrame.Position,
+                target.Position
+            ),
+            math.clamp(strength, 0.05, 1)
+        )
+    end
+)
+
+-- Cleanup
+script.Destroying:Connect(function()
+    RunService:UnbindFromRenderStep(TRACK_NAME)
+
+    for _, connection in ipairs(connections) do
+        connection:Disconnect()
+    end
+
+    for otherPlayer in pairs(espObjects) do
+        removeESP(otherPlayer)
+    end
+
+    if gui then
+        gui:Destroy()
     end
 end)
