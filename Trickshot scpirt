@@ -1,0 +1,273 @@
+
+-- NICKOY AND ECT
+-- [made by Nickoy]
+-- Studio aiming settings panel + FOV visualizer
+-- UI/configuration only; does not automatically aim at players.
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local settings = {
+    Enabled = false,
+    FOV = 120,
+    TargetPart = "Head",
+}
+
+_G.NickoyAimingSettings = settings
+
+local old = playerGui:FindFirstChild("NickoyAimbot")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "NickoyAimbot"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+-- Main panel
+local panel = Instance.new("Frame")
+panel.Name = "MainPanel"
+panel.Size = UDim2.fromOffset(270, 245)
+panel.Position = UDim2.new(0, 25, 0.35, 0)
+panel.BackgroundColor3 = Color3.fromRGB(17, 17, 20)
+panel.BorderSizePixel = 0
+panel.Parent = gui
+
+Instance.new("UICorner", panel).CornerRadius =
+    UDim.new(0, 10)
+
+local outline = Instance.new("UIStroke")
+outline.Color = Color3.fromRGB(235, 35, 50)
+outline.Thickness = 2
+outline.Parent = panel
+
+-- Header
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 38)
+header.BackgroundColor3 = Color3.fromRGB(35, 14, 18)
+header.BorderSizePixel = 0
+header.Parent = panel
+
+Instance.new("UICorner", header).CornerRadius =
+    UDim.new(0, 9)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -75, 1, 0)
+title.Position = UDim2.fromOffset(10, 0)
+title.BackgroundTransparency = 1
+title.Text = "NICKOY AND ECT"
+title.TextColor3 = Color3.fromRGB(255, 65, 75)
+title.TextSize = 15
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = header
+
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.fromOffset(28, 26)
+minimize.Position = UDim2.new(1, -63, 0, 6)
+minimize.Text = "-"
+minimize.TextSize = 20
+minimize.Font = Enum.Font.GothamBold
+minimize.TextColor3 = Color3.new(1, 1, 1)
+minimize.BackgroundColor3 = Color3.fromRGB(70, 30, 35)
+minimize.Parent = header
+Instance.new("UICorner", minimize).CornerRadius =
+    UDim.new(0, 5)
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(28, 26)
+close.Position = UDim2.new(1, -32, 0, 6)
+close.Text = "X"
+close.TextSize = 13
+close.Font = Enum.Font.GothamBold
+close.TextColor3 = Color3.new(1, 1, 1)
+close.BackgroundColor3 = Color3.fromRGB(170, 30, 40)
+close.Parent = header
+Instance.new("UICorner", close).CornerRadius =
+    UDim.new(0, 5)
+
+-- Content container
+local content = Instance.new("Frame")
+content.Position = UDim2.fromOffset(10, 45)
+content.Size = UDim2.new(1, -20, 1, -80)
+content.BackgroundTransparency = 1
+content.Parent = panel
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 8)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = content
+
+local function makeButton(text, order, callback)
+    local button = Instance.new("TextButton")
+    button.LayoutOrder = order
+    button.Size = UDim2.new(1, 0, 0, 36)
+    button.BackgroundColor3 = Color3.fromRGB(42, 42, 47)
+    button.TextColor3 = Color3.fromRGB(245, 245, 245)
+    button.TextSize = 13
+    button.Font = Enum.Font.GothamSemibold
+    button.Text = text
+    button.AutoButtonColor = true
+    button.Parent = content
+
+    Instance.new("UICorner", button).CornerRadius =
+        UDim.new(0, 6)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(75, 75, 80)
+    stroke.Thickness = 1
+    stroke.Parent = button
+
+    button.Activated:Connect(function()
+        callback(button)
+    end)
+
+    return button
+end
+
+-- FOV circle visual
+local circle = Instance.new("Frame")
+circle.Name = "FOVCircle"
+circle.AnchorPoint = Vector2.new(0.5, 0.5)
+circle.Position = UDim2.fromScale(0.5, 0.5)
+circle.Size = UDim2.fromOffset(settings.FOV * 2,
+    settings.FOV * 2)
+circle.BackgroundTransparency = 1
+circle.Visible = true
+circle.Parent = gui
+
+Instance.new("UICorner", circle).CornerRadius =
+    UDim.new(1, 0)
+
+local circleStroke = Instance.new("UIStroke")
+circleStroke.Color = Color3.fromRGB(255, 45, 60)
+circleStroke.Thickness = 1.5
+circleStroke.Transparency = 0.15
+circleStroke.Parent = circle
+
+local function updateCircle()
+    local viewport = workspace.CurrentCamera.ViewportSize
+    local diameter = math.min(settings.FOV * 2,
+        math.min(viewport.X, viewport.Y) - 10)
+
+    circle.Size = UDim2.fromOffset(diameter, diameter)
+end
+
+local toggleButton
+toggleButton = makeButton("Aiming: OFF", 1, function(button)
+    settings.Enabled = not settings.Enabled
+    button.Text = settings.Enabled and "Aiming: ON"
+        or "Aiming: OFF"
+
+    button.BackgroundColor3 = settings.Enabled
+        and Color3.fromRGB(135, 25, 38)
+        or Color3.fromRGB(42, 42, 47)
+
+    circleStroke.Color = settings.Enabled
+        and Color3.fromRGB(255, 40, 55)
+        or Color3.fromRGB(180, 180, 180)
+end)
+
+local fovButton
+fovButton = makeButton("FOV: 120  |  Change", 2, function(button)
+    settings.FOV = settings.FOV + 20
+    if settings.FOV > 300 then
+        settings.FOV = 60
+    end
+
+    button.Text = "FOV: " .. settings.FOV .. "  |  Change"
+    updateCircle()
+end)
+
+local partButton
+partButton = makeButton("Target Part: Head", 3, function(button)
+    settings.TargetPart =
+        settings.TargetPart == "Head"
+        and "HumanoidRootPart"
+        or "Head"
+
+    button.Text = "Target Part: " .. settings.TargetPart
+end)
+
+local circleButton
+circleButton = makeButton("FOV Circle: ON", 4, function(button)
+    circle.Visible = not circle.Visible
+    button.Text = circle.Visible
+        and "FOV Circle: ON"
+        or "FOV Circle: OFF"
+end)
+
+local credit = Instance.new("TextLabel")
+credit.Size = UDim2.new(1, -20, 0, 22)
+credit.Position = UDim2.new(0, 10, 1, -27)
+credit.BackgroundTransparency = 1
+credit.Text = "[made by Nickoy]"
+credit.TextColor3 = Color3.fromRGB(180, 180, 185)
+credit.TextSize = 11
+credit.Font = Enum.Font.Gotham
+credit.Parent = panel
+
+-- Minimize / restore
+local minimized = false
+
+minimize.Activated:Connect(function()
+    minimized = not minimized
+    content.Visible = not minimized
+    credit.Visible = not minimized
+    panel.Size = minimized
+        and UDim2.fromOffset(270, 38)
+        or UDim2.fromOffset(270, 245)
+
+    minimize.Text = minimized and "+" or "-"
+end)
+
+close.Activated:Connect(function()
+    gui:Destroy()
+end)
+
+-- Drag panel with mouse or touch
+local dragging = false
+local dragStart
+local startPosition
+
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPosition = panel.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not dragging then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(
+            startPosition.X.Scale,
+            startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale,
+            startPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+workspace.CurrentCamera:GetPropertyChangedSignal(
+    "ViewportSize"
+):Connect(updateCircle)
+
+updateCircle()
+print("[made by Nickoy] Panel loaded")
