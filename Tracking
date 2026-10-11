@@ -1,0 +1,113 @@
+
+-- [made by Nickoy]
+-- Tracking Panel + Working Toggle Button
+-- Place in StarterPlayer > StarterPlayerScripts
+-- Use in your own Roblox Studio game.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local tracking = false
+local maxRange = 250
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "NickoyTrackingPanel"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(270, 175)
+frame.Position = UDim2.new(0.05, 0, 0.35, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 38)
+title.BackgroundColor3 = Color3.fromRGB(60, 90, 180)
+title.Text = "[made by Nickoy] Tracker"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 16
+title.Parent = frame
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, -20, 0, 38)
+button.Position = UDim2.fromOffset(10, 48)
+button.BackgroundColor3 = Color3.fromRGB(170, 55, 55)
+button.Text = "TRACKING: OFF"
+button.TextColor3 = Color3.new(1, 1, 1)
+button.TextSize = 16
+button.Parent = frame
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 7)
+
+local rangeBox = Instance.new("TextBox")
+rangeBox.Size = UDim2.new(1, -20, 0, 30)
+rangeBox.Position = UDim2.fromOffset(10, 94)
+rangeBox.Text = "250"
+rangeBox.PlaceholderText = "Range in studs"
+rangeBox.ClearTextOnFocus = false
+rangeBox.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -20, 0, 30)
+status.Position = UDim2.fromOffset(10, 134)
+status.BackgroundTransparency = 1
+status.TextColor3 = Color3.new(1, 1, 1)
+status.Text = "Ready"
+status.TextSize = 13
+status.Parent = frame
+
+button.Activated:Connect(function()
+    tracking = not tracking
+
+    button.Text = tracking and "TRACKING: ON" or "TRACKING: OFF"
+    button.BackgroundColor3 = tracking
+        and Color3.fromRGB(40, 160, 90)
+        or Color3.fromRGB(170, 55, 55)
+
+    status.Text = tracking and "Searching..." or "Paused"
+end)
+
+rangeBox.FocusLost:Connect(function()
+    local value = tonumber(rangeBox.Text)
+    if value then
+        maxRange = math.clamp(math.floor(value), 1, 1000)
+    end
+    rangeBox.Text = tostring(maxRange)
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not tracking then return end
+
+    local char = player.Character
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local nearest, nearestDist
+
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            local targetChar = other.Character
+            local root = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+            local hum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+
+            if root and hum and hum.Health > 0 then
+                local dist = (root.Position - myRoot.Position).Magnitude
+
+                if dist <= maxRange and
+                    (not nearestDist or dist < nearestDist) then
+                    nearest = other
+                    nearestDist = dist
+                end
+            end
+        end
+    end
+
+    status.Text = nearest
+        and ("Target: " .. nearest.Name .. " | " .. math.floor(nearestDist) .. " studs")
+        or "No target in range"
+end)
